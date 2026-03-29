@@ -1,0 +1,41 @@
+services:
+  db:
+    build: .
+    container_name: pgcontainer
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      app_network:
+        ipv4_address: 10.100.0.2
+    restart: unless-stopped
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "80:80"
+    networks:
+      app_network:
+        ipv4_address: 10.100.0.3
+    volumes:
+       - pgadmin:/var/lib/pgadmin
+volumes:
+  pgadmin:
+  pgdata:
+
+networks:
+  app_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.100.0.0/16
+          gateway: 10.100.0.1
