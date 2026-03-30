@@ -1,11 +1,11 @@
-mod auth;
+mod services;
 mod config;
-mod entities;
+mod schemas;
 mod errors;
 mod models;
 
-use auth::handlers::login;
-use auth::handlers::register;
+use services::auth::handlers::login;
+use services::auth::handlers::register;
 use axum::Router;
 use axum::response::IntoResponse;
 use axum::routing::*;

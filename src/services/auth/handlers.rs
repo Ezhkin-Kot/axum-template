@@ -2,9 +2,9 @@ use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 
 use crate::{
     AppState,
-    auth::password_hashing::hash_password,
+    services::auth::password_hashing::hash_password,
     errors::auth::AuthError,
-    models::users::{LoginUser, RegisterUser},
+    schemas::users::{LoginUser, RegisterUser},
 };
 
 // TODO: реализовать ошибки Auth и тп и реализовать для них IntoResponse
