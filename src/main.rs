@@ -1,11 +1,10 @@
-mod services;
 mod config;
-mod schemas;
 mod errors;
+mod handlers;
 mod models;
+mod schemas;
+mod services;
 
-use services::auth::handlers::login;
-use services::auth::handlers::register;
 use axum::Router;
 use axum::response::IntoResponse;
 use axum::routing::*;
@@ -15,11 +14,20 @@ use sqlx::Postgres;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use config::*;
+
+use crate::handlers::auth::AuthDocs;
+use crate::handlers::auth::AuthRouter;
 async fn aboba() -> impl IntoResponse {
     "aboba".to_string()
 }
+
+#[derive(OpenApi)]
+#[openapi(info(title = "Blazingly-fast API!!!", version = "1.0.0"))]
+struct ApiDoc;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -36,13 +44,14 @@ async fn main() {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
 
-    let auth_router = Router::new()
-        .route("/registration", post(register))
-        .route("/login", post(login))
-        .route("/aboba", get(aboba));
+    let open_api = ApiDoc::openapi().nest("/auth", AuthDocs::openapi());
+    let swagger_router = SwaggerUi::new("/docs").url("/api-docs/openapi.json", open_api);
+
+    let auth_router = AuthRouter::set_router().route("/aboba", get(aboba));
 
     let app = Router::new()
         .nest("/auth", auth_router)
+        .merge(swagger_router)
         .with_state(state)
         .layer(
             CorsLayer::new()
