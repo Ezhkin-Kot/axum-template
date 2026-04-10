@@ -41,3 +41,12 @@ impl From<String> for Role {
         }
     }
 }
+
+impl From<Role> for String {
+    fn from(value: Role) -> Self {
+        match value {
+            Role::User => String::from("user"),
+            Role::Admin => String::from("admin"),
+        }
+    }
+}
