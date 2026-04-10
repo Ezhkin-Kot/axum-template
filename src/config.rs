@@ -28,7 +28,6 @@ pub async fn get_db_pool(database_url: &str) -> sqlx::PgPool {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db_pool: Arc<Pool<Postgres>>,
     pub user_repo: Arc<UserRepo<Postgres>>,
     pub secret_key: String,
     pub secret_refresh_key: String,
@@ -42,7 +41,6 @@ impl AppState {
     ) -> Self {
         Self {
             user_repo: Arc::new(UserRepo::new(db_pool.clone())),
-            db_pool,
             secret_key,
             secret_refresh_key,
         }
