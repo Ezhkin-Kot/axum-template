@@ -13,3 +13,11 @@ use uuid::Uuid;
 
 type Result<T> = std::result::Result<T, TokenError>;
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Claims {
+    pub sub: Uuid,
+    pub role: String,
+    pub exp: usize,
+    pub jti: Option<String>,
+}
+
