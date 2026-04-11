@@ -120,4 +120,30 @@ impl TokenService<Postgres> {
         Ok(token_data.claims)
     }
 
+    async fn validate_refresh_token(&self, token: &str) -> Result<Claims> {
+        let decoding_key = DecodingKey::from_secret(self.secret_refresh.as_bytes());
+        let mut validation = Validation::new(Algorithm::HS256);
+
+        validation.leeway = 0;
+        validation.required_spec_claims.insert("exp".to_string());
+
+        let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
+            Ok(t_d) => t_d,
+            Err(e) if *e.kind() == jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                return Err(TokenError::Expired);
+            }
+            Err(e) => return Err(TokenError::Jwt(e)),
+        };
+
+        let is_valid_token = match self.token_repo.get(&token_data.claims.sub).await? {
+            Some(u) => u == hash(token),
+            None => return Err(TokenError::RefreshNotFound),
+        };
+
+        if is_valid_token {
+            Ok(token_data.claims)
+        } else {
+            Err(TokenError::InvalidToken)
+        }
+    }
 }
