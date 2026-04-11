@@ -53,4 +53,22 @@ impl TokenService<Postgres> {
         }
     }
 
+    fn generate_access_token(&self, user: &User) -> Result<String> {
+        let exp = (SystemTime::now() + Duration::from_mins(self.access_duration as u64))
+            .duration_since(UNIX_EPOCH)?
+            .as_secs() as usize;
+
+        let claims = Claims {
+            sub: user.id,
+            role: String::from(user.role.clone()),
+            exp,
+            jti: None,
+        };
+
+        Ok(encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(self.secret.as_bytes()),
+        )?)
+    }
 }
