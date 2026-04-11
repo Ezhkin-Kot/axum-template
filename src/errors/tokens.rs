@@ -19,3 +19,22 @@ pub enum TokenError {
     RefreshNotFound,
 }
 
+impl IntoResponse for TokenError {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            Self::Database(er) => (StatusCode::INTERNAL_SERVER_ERROR, er.to_string()),
+            Self::DataTime(er) => (StatusCode::INTERNAL_SERVER_ERROR, er.to_string()),
+            Self::Jwt(er) => (StatusCode::UNAUTHORIZED, er.to_string()),
+            Self::Expired => (
+                StatusCode::UNAUTHORIZED,
+                "Refresh token expired".to_string(),
+            ),
+            Self::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid token".to_string()),
+            Self::RefreshNotFound => (
+                StatusCode::UNAUTHORIZED,
+                "Refresh token not found".to_string(),
+            ),
+        }
+        .into_response()
+    }
+}
