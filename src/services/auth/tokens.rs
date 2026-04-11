@@ -53,6 +53,24 @@ impl TokenService<Postgres> {
         }
     }
 
+    pub async fn generate_tokens(&self, user: &User) -> Result<Tokens> {
+        let access_token = self.generate_access_token(user)?;
+        let refresh_token = self.generate_refresh_token(user)?;
+
+        let _ = self
+            .token_repo
+            .create(
+                self.token_repo.db_pool.clone().as_ref(),
+                (&user.id, &refresh_token),
+            )
+            .await?;
+
+        Ok(Tokens {
+            access_token,
+            refresh_token,
+        })
+    }
+
     fn generate_access_token(&self, user: &User) -> Result<String> {
         let exp = (SystemTime::now() + Duration::from_mins(self.access_duration as u64))
             .duration_since(UNIX_EPOCH)?
