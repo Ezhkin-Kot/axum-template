@@ -3,12 +3,15 @@ use std::{
     task::{Context, Poll},
 };
 
-use axum::response::{IntoResponse};
+use axum::response::IntoResponse;
 use http::Request;
 use sqlx::Postgres;
 use tower::{Layer, Service};
 
-use crate::{errors::auth::AuthError, services::auth::tokens::TokenService};
+use crate::{
+    errors::{auth::AuthError, tokens::TokenError},
+    services::auth::tokens::TokenService,
+};
 
 #[derive(Clone)]
 pub struct AuthLayer {
@@ -49,16 +52,21 @@ where
         let mut inner = self.inner.clone();
         let token_serv = self.token_serv.clone();
         Box::pin(async move {
-            let auth_header = match req
+            let auth_header = req
                 .headers()
                 .get(http::header::AUTHORIZATION)
                 .and_then(|header| header.to_str().ok())
-            {
-                Some(aut_h) => aut_h[5..].trim(),
-                None => return Err(AuthError::Unauthorized.into_response()),
-            };
+                .ok_or(AuthError::Unauthorized.into_response())?;
 
-            let claims = match token_serv.validate_access_token(auth_header) {
+            let (schema, token) = auth_header
+                .split_once(' ')
+                .ok_or(TokenError::InvalidAuthHeader.into_response())?;
+
+            if !schema.eq_ignore_ascii_case("Bearer") {
+                return Err(TokenError::InvalidAuthSchema.into_response());
+            }
+
+            let claims = match token_serv.validate_access_token(token) {
                 Ok(cl) => cl,
                 Err(er) => return Err(er.into_response()),
             };
@@ -70,3 +78,4 @@ where
         })
     }
 }
+
