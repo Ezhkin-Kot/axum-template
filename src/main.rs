@@ -5,6 +5,7 @@ mod models;
 mod repositories;
 mod schemas;
 mod services;
+mod middlewares;
 
 use axum::Router;
 use axum::response::IntoResponse;
