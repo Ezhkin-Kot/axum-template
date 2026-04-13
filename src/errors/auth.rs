@@ -35,7 +35,7 @@ impl IntoResponse for AuthError {
             }
 
             Self::Forbidden => (
-                StatusCode::UNAUTHORIZED,
+                StatusCode::FORBIDDEN,
                 "User doesn't have sufficient rights for this action.".to_string(),
             )
                 .into_response(),
