@@ -21,9 +21,6 @@ pub struct Claims {
     pub jti: Option<String>,
 }
 
-#[derive(Clone)]
-pub struct CurrentUser(pub Claims);
-
 pub struct TokenService<Db: Database> {
     secret: Arc<String>,
     secret_refresh: Arc<String>,
@@ -155,7 +152,7 @@ impl TokenService<Postgres> {
         };
 
         let is_valid_token = match self.token_repo.get(&token_data.claims.sub).await? {
-            Some(u) => u == hash(token),
+            Some(old_token) => old_token == hash(token),
             None => return Err(TokenError::RefreshNotFound),
         };
 

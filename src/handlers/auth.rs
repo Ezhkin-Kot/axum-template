@@ -1,4 +1,10 @@
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
+use axum::{
+    Json, Router,
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{post, put},
+};
 use utoipa::OpenApi;
 
 use crate::{
@@ -6,7 +12,10 @@ use crate::{
     errors::auth::AuthError,
     models::tokens::Tokens,
     repositories::{is_unique_violation, users::UserRepository},
-    schemas::users::{LoginUser, RegisterUser},
+    schemas::{
+        tokens::RefreshToken,
+        users::{LoginUser, RegisterUser},
+    },
     services::auth::hashing::hash,
 };
 
@@ -17,11 +26,15 @@ impl AuthRouter {
         Router::new()
             .route("/registration", post(register))
             .route("/login", post(login))
+            .route("/refresh_tokens", put(refresh_tokens))
     }
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(register, login), components(schemas(LoginUser, RegisterUser)))]
+#[openapi(
+    paths(register, login, refresh_tokens),
+    components(schemas(LoginUser, RegisterUser, RefreshToken, Tokens))
+)]
 pub struct AuthDocs;
 
 // TODO: вынести логику в services
@@ -83,4 +96,28 @@ pub async fn login(
         )),
         None => Err(AuthError::Unauthorized),
     }
+}
+
+#[utoipa::path(
+    put,
+    path = "/refresh_tokens",
+    params (
+        ("old_refresh_token" = RefreshToken, Query, description = "Старый refresh token")
+    ),
+    responses(
+        (status = 200, description = "Токены обновлены", body = Tokens),
+        (status = 401, description = "Токен не валидный или протух", body = String),
+        (status = 500, description = "Технические шокаладки с бд", body = String)
+    )
+)]
+pub async fn refresh_tokens(
+    State(state): State<AppState>,
+    Query(old_refresh_token): Query<RefreshToken>,
+) -> Result<impl IntoResponse, AuthError> {
+    let token_serv = state.token_serv.clone();
+
+    Ok((
+        StatusCode::OK,
+        Json(token_serv.refresh_tokens(old_refresh_token.token).await?),
+    ))
 }
