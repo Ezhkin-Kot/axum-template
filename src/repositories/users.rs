@@ -1,5 +1,5 @@
 use macroses::NewTypeDeref;
-use sqlx::{Executor, Pool, Postgres, postgres::PgQueryResult};
+use sqlx::{Executor, Pool, Postgres};
 use std::{ops::Deref, sync::Arc};
 use uuid::Uuid;
 
@@ -15,11 +15,7 @@ pub trait UserRepository {
     async fn get_by_id(&self, id: &Uuid) -> sqlx::Result<Option<User>>;
     async fn get_by_email(&self, email: &str) -> sqlx::Result<Option<User>>;
     async fn check_login(&self, email: &str, password_hash: &str) -> sqlx::Result<Option<User>>;
-    async fn create_admin<'e, E>(
-        &self,
-        executer: E,
-        user: RegisterUser,
-    ) -> sqlx::Result<PgQueryResult>
+    async fn create_admin<'e, E>(&self, executer: E, user: RegisterUser) -> sqlx::Result<User>
     where
         E: Executor<'e, Database = sqlx::Postgres>;
     async fn create<'e, E>(&self, executer: E, user: RegisterUser) -> sqlx::Result<User>
@@ -91,26 +87,24 @@ impl UserRepository for UserRepo<Postgres> {
         .await
     }
 
-    async fn create_admin<'e, E>(
-        &self,
-        executer: E,
-        user: RegisterUser,
-    ) -> sqlx::Result<PgQueryResult>
+    async fn create_admin<'e, E>(&self, executer: E, user: RegisterUser) -> sqlx::Result<User>
     where
         E: Executor<'e, Database = sqlx::Postgres>,
     {
         let mut user_data: User = user.into();
         user_data.role = crate::models::users::Role::Admin;
-        sqlx::query!(
+        sqlx::query_as!(
+            User,
             "INSERT INTO users (id, name, email, role, password_hash)
-            VALUES ($1, $2, $3, $4, $5);",
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, name, email, role, password_hash;",
             user_data.id,
-            &user_data.name,
-            &user_data.email,
-            &String::from(user_data.role),
-            &user_data.password_hash
+            user_data.name,
+            user_data.email,
+            String::from(user_data.role),
+            user_data.password_hash
         )
-        .execute(executer)
+        .fetch_one(executer)
         .await
     }
 
