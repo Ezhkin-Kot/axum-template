@@ -1,6 +1,6 @@
 use axum::{
     Extension, Json, Router,
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     middleware::from_fn,
     response::IntoResponse,
@@ -13,7 +13,10 @@ use crate::{
     errors::users::UserError,
     middlewares::{auth::auth_middleware, role::role_middleware},
     models::users::{Role, User},
-    repositories::{is_unique_violation, users::UserRepository},
+    repositories::{
+        is_unique_violation,
+        users::{Limit, Offset, UserRepository},
+    },
     schemas::users::{RegisterUser, UserResponse},
     services::auth::tokens::Claims,
 };
@@ -26,6 +29,7 @@ impl UserRouter {
             .route("/my_profile", get(my_profile))
             .route("/create_admin", post(create_admin))
             .route("/", put(update))
+            .route("/{offset}/{page_limit}", get(get_with_pagination))
             .route_layer(from_fn(move |req, next| async move {
                 role_middleware(req, next, Role::all()).await
             }))
@@ -41,7 +45,7 @@ impl UserRouter {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(my_profile, create_admin, update),
+    paths(my_profile, create_admin, update, get_with_pagination),
     components(schemas(RegisterUser))
 )]
 pub struct UserDocs;
@@ -111,7 +115,7 @@ pub async fn create_admin(
     path = "",
     request_body = RegisterUser,
     responses(
-        (status = 204, description = "Данные обновленны", body = UserResponse),
+        (status = 204, description = "Данные обновленны"),
         (status = 404, description = "Пользователь не найден", body = String),
         (status = 500, description = "Технические шокаладки с бд", body = String)
     )
@@ -136,4 +140,44 @@ pub async fn update(
         return Err(UserError::NotFound);
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+// NOTE: если есть какая-то сложная ошибка связанная с handler-ом, но в handler-е ошибки нет, то
+// можно добавить перед ним #[axum::debug_handler] и он покажет более подробную ошибку
+#[utoipa::path(
+    get,
+    tag = "user",
+    security(
+        ("bearer_auth" = [])
+    ),
+    path = "/{offset}/{page_limit}",
+    params(
+        ("offset" = u64, Path, description = "Смещение (offset)"),
+        ("page_limit" = u64, Path, description = "Лимит записей")
+    ),
+    responses(
+        (status = 200, description = "Пользователи найдены", body = Vec<UserResponse>),
+        (status = 204, description = "Пользователей нет в данном диапазоне"),
+        (status = 500, description = "Технические шокаладки с бд", body = String)
+    )
+)]
+pub async fn get_with_pagination(
+    Path((offset, page_limit)): Path<(Offset, Limit)>,
+    State(state): State<AppState>,
+    // NOTE: с путем /{offset}/aboba/{page_limit} будет работать аналогчино
+) -> Result<impl IntoResponse, UserError> {
+    let repo = state.user_repo.clone();
+    let users_vec = repo
+        .get(&offset, &page_limit)
+        .await?
+        .into_iter()
+        .map(UserResponse::from)
+        .collect::<Vec<_>>();
+
+    // NOTE: в случае кортежей разной длины в Ok надо делать .into_response()
+    if users_vec.is_empty() {
+        Ok(StatusCode::NO_CONTENT.into_response())
+    } else {
+        Ok((StatusCode::OK, Json(users_vec)).into_response())
+    }
 }
