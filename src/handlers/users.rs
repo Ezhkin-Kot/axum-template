@@ -14,6 +14,25 @@ use crate::{
     services::auth::tokens::Claims,
 };
 
+pub struct UserRouter;
+
+impl UserRouter {
+    pub fn set_router(state: AppState) -> Router<AppState> {
+        Router::new()
+            .route("/my_profile", get(my_profile))
+            .route_layer(from_fn(move |req, next| async move {
+                role_middleware(req, next, Role::all()).await
+            }))
+            .route_layer({
+                let token_serv = state.token_serv.clone();
+                from_fn(move |req, next| {
+                    let token_serv = token_serv.clone();
+                    async move { auth_middleware(req, next, token_serv.clone()).await }
+                })
+            })
+    }
+}
+
 #[derive(OpenApi)]
 #[openapi(paths(my_profile), components(schemas(RegisterUser)))]
 pub struct UserDocs;
