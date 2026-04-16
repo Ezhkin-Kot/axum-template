@@ -1,5 +1,8 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
+
+use crate::models::users::User;
 
 #[derive(Deserialize, ToSchema, Clone)]
 pub struct RegisterUser {
@@ -14,8 +17,19 @@ pub struct LoginUser {
     pub password: String,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
+    pub id: Uuid,
     pub name: String,
     pub email: String,
+}
+
+impl From<User> for UserResponse {
+    fn from(value: User) -> Self {
+        Self {
+            id: value.id,
+            name: value.name,
+            email: value.email,
+        }
+    }
 }
