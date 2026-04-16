@@ -1,6 +1,10 @@
 use axum::{
-    Extension, Json, Router, extract::State, http::StatusCode, middleware::from_fn,
-    response::IntoResponse, routing::get,
+    Extension, Json, Router,
+    extract::State,
+    http::StatusCode,
+    middleware::from_fn,
+    response::IntoResponse,
+    routing::{get, post},
 };
 use utoipa::OpenApi;
 
@@ -20,6 +24,7 @@ impl UserRouter {
     pub fn set_router(state: AppState) -> Router<AppState> {
         Router::new()
             .route("/my_profile", get(my_profile))
+            .route("/create_admin", post(create_admin))
             .route_layer(from_fn(move |req, next| async move {
                 role_middleware(req, next, Role::all()).await
             }))
@@ -60,4 +65,32 @@ pub async fn my_profile(
         Some(user) => Ok((StatusCode::OK, Json(UserResponse::from(user)))),
         None => Err(UserError::NotFound),
     }
+}
+
+#[utoipa::path(
+    post,
+    // NOTE: обязательно надо добавть, чтобы с свагера на эту ручку отправлялся токен
+    security(
+        ("bearer_auth" = [])
+    ),
+    path = "/create_admin",
+    responses(
+        (status = 200, description = "Админ создан", body = UserResponse),
+        (status = 409, description = "Пользователь с такой почтой уже существует", body = String),
+        (status = 500, description = "Технические шокаладки с бд", body = String)
+    )
+)]
+pub async fn create_admin(
+    State(state): State<AppState>,
+    Json(user_data): Json<RegisterUser>,
+) -> Result<impl IntoResponse, UserError> {
+    let repo = state.user_repo.clone();
+
+    Ok((
+        StatusCode::OK,
+        Json(UserResponse::from(
+            repo.create_admin(repo.db_pool.clone().as_ref(), user_data)
+                .await?,
+        )),
+    ))
 }
