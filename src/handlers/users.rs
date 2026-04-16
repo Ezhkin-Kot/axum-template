@@ -13,7 +13,7 @@ use crate::{
     errors::users::UserError,
     middlewares::{auth::auth_middleware, role::role_middleware},
     models::users::{Role, User},
-    repositories::users::UserRepository,
+    repositories::{is_unique_violation, users::UserRepository},
     schemas::users::{RegisterUser, UserResponse},
     services::auth::tokens::Claims,
 };
@@ -92,17 +92,19 @@ pub async fn create_admin(
 ) -> Result<impl IntoResponse, UserError> {
     let repo = state.user_repo.clone();
 
-    Ok((
-        StatusCode::OK,
-        Json(UserResponse::from(
-            repo.create_admin(repo.db_pool.clone().as_ref(), user_data)
-                .await?,
-        )),
-    ))
+    match repo
+        .create_admin(repo.db_pool.clone().as_ref(), user_data)
+        .await
+    {
+        Ok(admin) => Ok((StatusCode::OK, Json(UserResponse::from(admin)))),
+        Err(e) if is_unique_violation(&e) => Err(UserError::UserAlreadyExists),
+        Err(e) => Err(UserError::Db(e)),
+    }
 }
 
 #[utoipa::path(
     put,
+    tag = "user",
     security(
         ("bearer_auth" = [])
     ),
