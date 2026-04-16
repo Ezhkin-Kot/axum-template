@@ -1,5 +1,5 @@
 use macroses::NewTypeDeref;
-use sqlx::{Executor, Pool, Postgres};
+use sqlx::{Executor, Pool, Postgres, postgres::PgQueryResult};
 use std::{ops::Deref, sync::Arc};
 use uuid::Uuid;
 
@@ -21,7 +21,7 @@ pub trait UserRepository {
     async fn create<'e, E>(&self, executer: E, user: RegisterUser) -> sqlx::Result<User>
     where
         E: Executor<'e, Database = sqlx::Postgres>;
-    async fn update<'e, E>(&self, executer: E, user: User) -> sqlx::Result<User>
+    async fn update<'e, E>(&self, executer: E, user: User) -> sqlx::Result<PgQueryResult>
     where
         E: Executor<'e, Database = sqlx::Postgres>;
 }
@@ -128,23 +128,21 @@ impl UserRepository for UserRepo<Postgres> {
         .await
     }
 
-    async fn update<'e, E>(&self, executer: E, user: User) -> sqlx::Result<User>
+    async fn update<'e, E>(&self, executer: E, user: User) -> sqlx::Result<PgQueryResult>
     where
         E: Executor<'e, Database = sqlx::Postgres>,
     {
-        sqlx::query_as!(
-            User,
+        sqlx::query!(
             "UPDATE users
             SET name = $2, email = $3, role = $4, password_hash = $5
-            WHERE id = $1
-            RETURNING id, name, email, role, password_hash;",
+            WHERE id = $1;",
             user.id,
             user.name,
             user.email,
             String::from(user.role),
             user.password_hash
         )
-        .fetch_one(executer)
+        .execute(executer)
         .await
     }
 }
